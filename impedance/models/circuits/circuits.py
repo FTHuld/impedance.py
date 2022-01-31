@@ -461,3 +461,53 @@ class CustomCircuit(BaseCircuit):
                              f'({len(self.constants)})' +
                              ' must be equal to ' +
                              f'the circuit length ({circuit_len})')
+
+def componentFitting(circuit_string, params, frequencies=np.logspace(5, -2), circuit_name=''):
+    """ A function for simulating serial components of an equivalent circuit separately.
+
+    Parameters
+    ----------
+    circuit_string: string
+        The equivalent circuit string to be split
+    params: list
+        The parameters used for simulating the circuits.
+    frequencies: numpy array
+        The frequency range to simulate the circuit over. default is np.logspace(5, -2)
+    circuit_name: string
+        (optional) Name of complete circuit
+
+    Notes
+    -----
+    Takes an equivalent circuit string and a list of associated parameters, and simulates each serial component (separated
+    by a '-') iteratively using the predict() function.
+    The result is returned as a dict containing the data from predict(), as well as the array of frequencies and complete
+    circuit.
+    """
+    # Simulate entire circuit first and add it to our output. This is an easy way to check if the string and parameters actually match.
+    # Should CustomCircuit be used here? This doesn't work with built-in circuits
+    tot_circ = CustomCircuit(circuit_string, initial_guess=params)
+    tot_Z = tot_circ.predict(np.logspace(5, -2))
+
+    # Allow user to specify the key for the fit of complete circuit. Useful for large circuits.
+    # If circuit_name is not specified, circuit_string will be used as the key.
+    if circuit_name != '':
+        comp_results = {f'frequencies': frequencies, f'{circuit_name}': tot_Z}
+    else:
+        comp_results = {f'frequencies': frequencies, f'{circuit_string}': tot_Z}
+
+    comp = circuit_string.split('-')
+    var_num = 0
+
+    for c in comp:
+
+        comp_len = calculateCircuitLength(c)  # Defines number of values to take from
+        var_num = var_num + comp_len  # Defines end-point in the list of results
+        sub_circ = CustomCircuit(c, initial_guess=params[var_num - comp_len:var_num])
+        Z = sub_circ.predict(frequencies)
+
+        # This could be more elegant
+        if isinstance(Z[0], np.ndarray):
+            comp_results[f'{c}'] = Z[0]
+        else:
+            comp_results[f'{c}'] = Z
+    return comp_results
